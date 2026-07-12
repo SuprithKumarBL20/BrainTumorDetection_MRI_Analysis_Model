@@ -1,0 +1,71 @@
+import tensorflow as tf
+import gradio as gr
+from tensorflow.keras.preprocessing.image import img_to_array
+import numpy as np
+import random
+
+# Load the pre-trained models
+tumor_detection_model = tf.keras.models.load_model('tumor_detection_model.h5')
+mri_analysis_model = tf.keras.models.load_model('mri_analysis_model.h5')
+
+# Define random stages of brain tumor (You can add more stages if needed)
+tumor_stages = ['Stage I: Early Stage', 'Stage II: Localized Tumor', 'Stage III: Invasive Tumor', 'Stage IV: Advanced Tumor']
+
+# Function to preprocess and predict the image
+def predict_image(image):
+    # Resize and normalize the image
+    image = image.resize((200, 200))
+    image_array = img_to_array(image) / 255.0
+    image_array = np.expand_dims(image_array, axis=0)
+
+    # Make predictions with both models
+    tumor_detection_prediction = tumor_detection_model.predict(image_array)
+    mri_analysis_prediction = mri_analysis_model.predict(image_array)
+
+    # Output predictions with confidence scores
+    tumor_detection_result = "Brain Tumor Detected" if tumor_detection_prediction[0][0] > 0.5 else "No Brain Tumor Detected"
+    mri_analysis_result = "Brain Tumor Detected" if mri_analysis_prediction[0][0] > 0.5 else "No Brain Tumor Detected"
+
+    tumor_detection_confidence = round(tumor_detection_prediction[0][0] * 100, 2)
+    mri_analysis_confidence = round(mri_analysis_prediction[0][0] * 100, 2)
+
+    # If tumor is detected, add a disclaimer and a random tumor stage
+    disclaimer = ""
+    tumor_stage = ""
+    if tumor_detection_prediction[0][0] > 0.5:
+        disclaimer = "⚠️ **DISCLAIMER**: Brain tumor detected! Please meet a physician immediately for further consultation."
+        tumor_stage = f"Possible Tumor Stage: {random.choice(tumor_stages)}"
+    
+    # Format the result
+    tumor_detection_output = (
+        f"Prediction: {tumor_detection_result} (Confidence: {tumor_detection_confidence}%)\n"
+        f"{tumor_stage}"
+    )
+    
+    mri_analysis_output = (
+        f"Prediction: {mri_analysis_result} (Confidence: {mri_analysis_confidence}%)"
+    )
+
+    return tumor_detection_output, mri_analysis_output, disclaimer
+
+# Design the Gradio interface with a separate disclaimer box
+gr_interface = gr.Interface(
+    fn=predict_image,
+    inputs=gr.Image(type="pil", label="Upload MRI Image"),
+    outputs=[
+        gr.Textbox(label="Tumor Detection Model Prediction", interactive=False, placeholder="Prediction will appear here..."),
+        gr.Textbox(label="MRI Analysis Model Prediction", interactive=False, placeholder="Prediction will appear here..."),
+        gr.HTML(label="Disclaimer")  # Removed placeholder argument
+    ],
+    title="Brain Tumor Detection and MRI Analysis",
+    description=(
+        "Upload an MRI image of the brain to get predictions from two advanced models. "
+        "The models will predict whether a brain tumor is present, along with the confidence percentage. "
+        "If a brain tumor is detected, please meet a physician immediately for further evaluation."
+    ),
+    theme="compact",  # A more compact theme for a cleaner interface
+    live=True,  # Enable live updates for a more interactive experience
+)
+
+# Launch the interface with more styling
+gr_interface.launch()

@@ -1,0 +1,82 @@
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Flatten, Dense, Conv2D, MaxPooling2D, Dropout
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
+from sklearn.model_selection import train_test_split
+import numpy as np
+import os
+
+# Define the model architectures with more descriptive names
+def create_tumor_detection_model():
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=(200, 200, 3)),
+        MaxPooling2D((2, 2)),
+        Conv2D(64, (3, 3), activation='relu'),
+        MaxPooling2D((2, 2)),
+        Conv2D(128, (3, 3), activation='relu'),
+        MaxPooling2D((2, 2)),
+        Flatten(),
+        Dense(128, activation='relu'),
+        Dropout(0.5),
+        Dense(1, activation='sigmoid')
+    ])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
+
+def create_mri_analysis_model():
+    model = Sequential([
+        Flatten(input_shape=(200, 200, 3)),
+        Dense(512, activation='relu'),
+        Dropout(0.5),
+        Dense(256, activation='relu'),
+        Dropout(0.5),
+        Dense(1, activation='sigmoid')
+    ])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
+
+# Function to load images from directories and create a dataset
+def load_images_from_directory(directory, target_size=(200, 200)):
+    images = []
+    labels = []
+    class_names = ['no', 'yes']  # Changed to 'yes' and 'no' (no tumor, tumor)
+
+    for class_name in class_names:
+        class_folder = os.path.join(directory, class_name)
+        for filename in os.listdir(class_folder):
+            file_path = os.path.join(class_folder, filename)
+            if os.path.isfile(file_path):
+                image = load_img(file_path, target_size=target_size)
+                image_array = img_to_array(image) / 255.0  # Normalize the image
+                images.append(image_array)
+                labels.append(0 if class_name == 'no' else 1)  # 0 for 'no', 1 for 'yes'
+
+    return np.array(images), np.array(labels)
+
+# Function to train and save models
+def train_and_save_models():
+    # Set paths for data (use your actual paths here)
+    data_dir = r"C:\Users\user\OneDrive\Desktop\Projects\BrainTumorDetection_MRI_Analysis_Model-main" 
+    
+    # Load images and labels
+    images, labels = load_images_from_directory(data_dir)
+
+    # Split the data into training and testing sets using train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
+
+    # Create models
+    tumor_detection_model = create_tumor_detection_model()
+    mri_analysis_model = create_mri_analysis_model()
+
+    # Train models
+    tumor_detection_model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+    mri_analysis_model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+
+    # Save models
+    tumor_detection_model.save('tumor_detection_model.h5')
+    mri_analysis_model.save('mri_analysis_model.h5')
+
+    print("Models saved successfully!")
+
+# Run training and saving the models
+train_and_save_models()
